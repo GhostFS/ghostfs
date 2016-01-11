@@ -20,34 +20,41 @@ endif(CCACHE_FOUND)
 
 find_package(fuse REQUIRED)
 find_package(CURL REQUIRED)
+find_package(Boost REQUIRED)
+find_package(Boost COMPONENTS system filesystem  REQUIRED)
+find_package(PythonLibs 2.7 REQUIRED)
 
 set(
     GHOST_LIBRARIES
     ${FUSE_LIBRARIES}
     ${CURL_LIBRARIES}
+    ${PYTHON_LIBRARIES}
+    ${Boost_FILESYSTEM_LIBRARY}
+    ${Boost_SYSTEM_LIBRARY}
 )
 
 #Define compilation flags
 
 set(CMAKE_CXX_FLAGS         "${CMAKE_CXX_FLAGS} --std=c++11 -Wall -pthread -D_FILE_OFFSET_BITS=64")
-set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_DEBUG} -fno-inline -ggdb -DDEBUG --std=c++11 -Wall")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE} -O2 -DNDEBUG --std=c++11 -Wall")
+set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_DEBUG} -fno-inline -ggdb -DDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE} -O2 -DNDEBUG")
 
 #Configure instalation settings
 
-set(CMAKE_INSTALL_PATH /usr/bin)
+set(INSTALL_BIN_DIR /usr/bin)
+set(INSTALL_LIB_DIR /usr/lib)
 
 #Add source codes and generate executables
 
 include_directories(
     ${FUSE_INCLUDE_DIRS}
     ${CURL_INCLUDE_DIRS}
+    ${PYTHON_INCLUDE_DIR}
     ${CMAKE_SOURCE_DIR}
 )
 
-add_executable(ghostfs
-    main.cc
-
+set(BUILD_SHARED_LIBS FALSE)
+add_library(ghostfs_lib
     ghost_file.cc
     block_info.cc
     cache.cc
@@ -56,6 +63,8 @@ add_executable(ghostfs
 
     protocol/base_protocol.cc
     protocol/http_protocol.cc
+    protocol/load_drivers.cc
+    protocol/python_driver.cc
 
     ghost_file.h
     block_info.h
@@ -65,22 +74,35 @@ add_executable(ghostfs
 
     protocol/base_protocol.h
     protocol/http_protocol.h
+    protocol/load_drivers.h
+    protocol/python_driver.h
+)
+
+add_executable(ghostfs
+    main.cc
 )
 
 target_link_libraries(
     ghostfs
     ${GHOST_LIBRARIES}
+    ghostfs_lib
+    dl
 )
 
 install(
     TARGETS ghostfs
-    DESTINATION "${CMAKE_INSTALL_PATH}"
+    DESTINATION "${INSTALL_BIN_DIR}"
     COMPONENT application
 )
 
 install(
+    TARGETS ghostfs_lib
+    DESTINATION "${INSTALL_LIB_DIR}"
+)
+
+install(
     FILES ${CMAKE_CURRENT_SOURCE_DIR}/gmount
-    DESTINATION "${CMAKE_INSTALL_PATH}"
+    DESTINATION "${INSTALL_BIN_DIR}"
     PERMISSIONS
         OWNER_READ OWNER_WRITE OWNER_EXECUTE
         GROUP_READ GROUP_WRITE GROUP_EXECUTE
