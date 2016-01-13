@@ -152,6 +152,8 @@ static void do_prefetch(cache& c, ghost_file& file, size_t blk_id, std::string f
 
     if (!handler) return;
 
+    // XXX: handle possible failure here, so we will have to deallocate block, provide
+    // the function in cache.
     handler->get_block(file_url.data(), blk_id, c.block_size(),
         file.attributes(), info._blk->_data);
 
@@ -248,7 +250,18 @@ static int ghost_read(const char *path, char *buf, size_t size, off_t offset,
             log("\tnot cached, hit ratio=%6.2f%%\n", c.get_hit_ratio());
             blk = c.allocate_block(&info);
             c._mtx.unlock();
-            handler->get_block(file_url, blk_id, block_size, file.attributes(), blk->_data);
+            size_t bytes_read = handler->get_block(file_url, blk_id, block_size, file.attributes(), blk->_data);
+            // If get_block() was unable to get the amount of bytes asked, then we should return EIO.
+            if (bytes_read < to_read) {
+                log("get_block failed for block %ld, expected=%ld, actual=%ld\n", blk_id, to_read, bytes_read);
+                // TODO: we're still leaking the block previously allocated, so let's provide a function
+                // in cache to deallocate a block. This function will have to reset block info because
+                // block content is invalid if get_block() failed.
+                info._mtx.unlock();
+                return -EIO;
+            }
+            // If bytes read is greater than block size, then there is an overflow in blk->_data
+            assert(bytes_read <= block_size);
         } else {
             c._hits++;
             log("\tcached, hit ratio=%6.2f%%\n", c.get_hit_ratio());
@@ -262,6 +275,7 @@ static int ghost_read(const char *path, char *buf, size_t size, off_t offset,
         assert(buf_offset + to_read <= size);
         memcpy(buf + buf_offset, blk->_data + blk_offset, to_read);
 
+        // TODO: Possibly, we will have to acquire cache mutex to unlock block.
         c.unlock_block(blk);
         info._mtx.unlock();
 
