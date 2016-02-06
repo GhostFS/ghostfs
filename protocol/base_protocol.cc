@@ -34,15 +34,15 @@ void register_handler(struct base_protocol *handler) {
 }
 
 std::string get_protocol(const std::string& path) {
-    auto tokens = split(path, ':');
+    auto tokens = std::move(split(path, ':'));
 
     if (tokens.size() == 0) return "";
 
-    return tokens[0];
+    return std::move(tokens[0]);
 }
 
 struct base_protocol *get_handler(const char *path) {
-    auto it = handlers_.find(get_protocol(path));
+    auto it = handlers_.find(std::move(get_protocol(path)));
 
     if (it == handlers_.end()) return 0;
 

@@ -25,7 +25,7 @@ std::vector<std::string> &split(const std::string &s, char delim,
 std::vector<std::string> split(const std::string &s, char delim) {
     std::vector<std::string> elems;
     split(s, delim, elems);
-    return elems;
+    return std::move(elems);
 }
 
 int log(const char *format, ...) {
